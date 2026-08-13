@@ -39,17 +39,23 @@ io.on('connection', (socket) => {
   });
 
   // Viewer phone calls this when it wants to watch a camera
-  socket.on('join-viewer', (roomCode) => {
+  // payload is now { roomCode, mode } where mode is 'full' | 'audio' | 'low'
+  socket.on('join-viewer', (payload) => {
+    const roomCode = typeof payload === 'string' ? payload : payload.roomCode;
+    const mode = typeof payload === 'string' ? 'full' : (payload.mode || 'full');
+
     if (!rooms[roomCode] || !rooms[roomCode].camera) {
       socket.emit('room-not-found');
       return;
     }
     rooms[roomCode].viewer = socket.id;
+    rooms[roomCode].mode = mode;
     socket.join(roomCode);
-    console.log(`Viewer joined room ${roomCode}`);
+    console.log(`Viewer joined room ${roomCode} with mode: ${mode}`);
 
-    // Tell the camera a viewer has joined, so it can start the WebRTC handshake
-    io.to(rooms[roomCode].camera).emit('viewer-joined');
+    // Tell the camera a viewer has joined (and which quality mode they want),
+    // so it can start the WebRTC handshake accordingly
+    io.to(rooms[roomCode].camera).emit('viewer-joined', { mode });
   });
 
   // Relay WebRTC connection info between camera and viewer
